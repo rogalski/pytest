@@ -4,7 +4,7 @@ import pytest
 import doctest
 
 from pytest import approx
-from operator import eq, ne
+from operator import eq, ne, lt, gt, le, ge
 from decimal import Decimal
 from fractions import Fraction
 inf, nan = float('inf'), float('nan')
@@ -34,6 +34,10 @@ class TestApprox:
         assert not (1 != approx(1, rel=1e-6, abs=1e-12))
         assert 10 != approx(1, rel=1e-6, abs=1e-12)
         assert not (10 == approx(1, rel=1e-6, abs=1e-12))
+        assert 0 < approx(1, rel=1e-6, abs=1e-12)
+        assert 1 <= approx(1, rel=1e-6, abs=1e-12)
+        assert 2 > approx(1, rel=1e-6, abs=1e-12)
+        assert 1 >= approx(1, rel=1e-6, abs=1e-12)
 
     def test_exactly_equal(self):
         examples = [
@@ -84,7 +88,7 @@ class TestApprox:
                 1.1 == approx(1, **kwargs)
 
     def test_inf_tolerance(self):
-        # Everything should be equal if the tolerance is infinite.
+        # Everything should be equal, lower and greater if the tolerance is infinite.
         large_diffs = [
                 (1, 1000),
                 (1e-50, 1e50),
@@ -93,9 +97,10 @@ class TestApprox:
         ]
         for a, x in large_diffs:
             assert a != approx(x, rel=0.0, abs=0.0)
-            assert a == approx(x, rel=inf, abs=0.0)
-            assert a == approx(x, rel=0.0, abs=inf)
-            assert a == approx(x, rel=inf, abs=inf)
+            for op in (eq, le, ge, lt, gt):
+                assert op(a, approx(x, rel=inf, abs=0.0))
+                assert op(a, approx(x, rel=0.0, abs=inf))
+                assert op(a, approx(x, rel=inf, abs=inf))
 
     def test_inf_tolerance_expecting_zero(self):
         # If the relative tolerance is zero but the expected value is infinite,
@@ -158,6 +163,11 @@ class TestApprox:
         assert 1e-8 + 1e-16 == approx(1e-8, rel=5e-8, abs=5e-17)
         assert 1e-8 + 1e-16 != approx(1e-8, rel=5e-9, abs=5e-17)
 
+    def test_gt_lt_ge_le_with_sequence(self):
+        for op in (gt, lt, ge, le):
+            with pytest.raises(ValueError):
+                assert op([1, 2, 3], approx([1, 2, 3]))
+
     def test_relative_tolerance(self):
         within_1e8_rel = [
                 (1e8 + 1e0, 1e8),
@@ -167,6 +177,7 @@ class TestApprox:
         for a, x in within_1e8_rel:
             assert a == approx(x, rel=5e-8, abs=0.0)
             assert a != approx(x, rel=5e-9, abs=0.0)
+            assert a > approx(x, rel=5e-9, abs=0.0)
 
     def test_absolute_tolerance(self):
         within_1e8_abs = [
@@ -177,6 +188,7 @@ class TestApprox:
         for a, x in within_1e8_abs:
             assert a == approx(x, rel=0, abs=5e-8)
             assert a != approx(x, rel=0, abs=5e-9)
+            assert a > approx(x, rel=0, abs=5e-9)
 
     def test_expecting_zero(self):
         examples = [

@@ -1244,6 +1244,25 @@ class RaisesContext(object):
 
 
 # builtin pytest.approx helper
+USER_FRIENDLY_COMPARISONS = {
+    '__gt__': '>',
+    '__ge__': '>=',
+    '__lt__': '<',
+    '__le__': '<=',
+}
+
+
+def _assert_expected_is_scalar(method):
+    from functools import wraps
+
+    @wraps(method)
+    def wrapper(self, actual):
+        if isinstance(self._expected, collections.Iterable):
+            raise ValueError('approx cannot be used with {0} comparision between sequences'.
+                             format(USER_FRIENDLY_COMPARISONS.get(method.__name__, 'unknown')))
+        return method(self, actual)
+    return wrapper
+
 
 class approx(object):
     """
@@ -1380,6 +1399,22 @@ class approx(object):
     def __ne__(self, actual):
         return not (actual == self)
 
+    @_assert_expected_is_scalar
+    def __lt__(self, actual):
+        return self.expected[0] < actual
+
+    @_assert_expected_is_scalar
+    def __le__(self, actual):
+        return self.expected[0] <= actual
+
+    @_assert_expected_is_scalar
+    def __ge__(self, actual):
+        return self.expected[0] >= actual
+
+    @_assert_expected_is_scalar
+    def __gt__(self, actual):
+        return self.expected[0] > actual
+
     @property
     def expected(self):
         # Regardless of whether the user-specified expected value is a number
@@ -1461,6 +1496,18 @@ class ApproxNonIterable(object):
     def __ne__(self, actual):
         return not (actual == self)
 
+    def __lt__(self, actual):
+        return self.min_value < actual
+
+    def __le__(self, actual):
+        return self.min_value <= actual
+
+    def __gt__(self, actual):
+        return self.max_value > actual
+
+    def __ge__(self, actual):
+        return self.max_value >= actual
+
     @property
     def tolerance(self):
         set_default = lambda x, default: x if x is not None else default
@@ -1494,6 +1541,14 @@ class ApproxNonIterable(object):
 
         # Return the larger of the relative and absolute tolerances.
         return max(relative_tolerance, absolute_tolerance)
+
+    @property
+    def max_value(self):
+        return self.expected + self.tolerance
+
+    @property
+    def min_value(self):
+        return self.expected - self.tolerance
 
 
 #
